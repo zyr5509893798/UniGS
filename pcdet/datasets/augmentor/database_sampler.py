@@ -25,23 +25,48 @@ class DataBaseSampler(object):
         self.img_aug_mixup = sampler_cfg.get('IMG_AUG_MIXUP', 0.7)
 
         self.logger = logger
+        # 步骤1: 初始化空的 db_infos
         self.db_infos = {}
         for class_name in class_names:
-            self.db_infos[class_name] = []
+            self.db_infos[class_name] = []  # 为每个类创建空列表
+
+        # 步骤2: 打印当前 db_infos
+        print(f"[DEBUG] infos['Vehicle'] exists: {'Vehicle' in self.db_infos}")
+        print(f"[DEBUG] infos['Vehicle'] length: {len(self.db_infos['Vehicle']) if 'Vehicle' in self.db_infos else 0}")
 
         self.use_shared_memory = sampler_cfg.get('USE_SHARED_MEMORY', False)
 
         for db_info_path in sampler_cfg.DB_INFO_PATH:
             db_info_path = self.root_path.resolve() / db_info_path
+            print(f"[DEBUG] Attempting to load database from: {db_info_path}")
+
+            # 检查文件是否存在
             if not db_info_path.exists():
+                print(f"[ERROR] Database file not found at: {db_info_path}")
                 assert len(sampler_cfg.DB_INFO_PATH) == 1
                 sampler_cfg.DB_INFO_PATH[0] = sampler_cfg.BACKUP_DB_INFO['DB_INFO_PATH']
                 sampler_cfg.DB_DATA_PATH[0] = sampler_cfg.BACKUP_DB_INFO['DB_DATA_PATH']
                 db_info_path = self.root_path.resolve() / sampler_cfg.DB_INFO_PATH[0]
                 sampler_cfg.NUM_POINT_FEATURES = sampler_cfg.BACKUP_DB_INFO['NUM_POINT_FEATURES']
 
+            # 检查文件大小
+            file_size = db_info_path.stat().st_size
+            print(f"[DEBUG] Database file size: {file_size} bytes")
+            if file_size == 0:
+                print("[ERROR] Database file is empty (0 bytes)")
+                continue
+
             with open(str(db_info_path), 'rb') as f:
                 infos = pickle.load(f)
+                # 修改此处：
+                for cur_class in class_names:
+                    # 确保 cur_class 存在于 infos 中
+                    if cur_class not in infos:
+                        # 添加详细错误信息
+                        available_classes = list(infos.keys())
+                        print(f"ERROR: Class '{cur_class}' not found in database!")
+                        print(f"Available classes in database: {available_classes}")
+                        continue
                 [self.db_infos[cur_class].extend(infos[cur_class]) for cur_class in class_names]
 
         for func_name, val in sampler_cfg.PREPARE.items():

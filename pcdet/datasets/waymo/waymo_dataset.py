@@ -33,6 +33,19 @@ class WaymoDataset(DatasetTemplate):
         self.infos = []
         self.seq_name_to_infos = self.include_waymo_data(self.mode)
 
+        self.camera_config = self.dataset_cfg.get('CAMERA_CONFIG', None)
+        if self.camera_config is not None:
+            self.use_camera = self.camera_config.get('USE_CAMERA', True)
+        else:
+            self.use_camera = False
+
+        self.map_config = self.dataset_cfg.get('MAP_CONFIG', None)
+        if self.map_config is not None:
+            self.use_map = self.map_config.get('USE_MAP', True)
+            self.map_classes = self.map_config.CLASS_NAMES
+        else:
+            self.use_map = False
+
         self.use_shared_memory = self.dataset_cfg.get('USE_SHARED_MEMORY', False) and self.training
         if self.use_shared_memory:
             self.shared_memory_file_limit = self.dataset_cfg.get('SHARED_MEMORY_FILE_LIMIT', 0x7FFFFFFF)
@@ -789,7 +802,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+    ROOT_DIR = Path('/data2')
 
     if args.func == 'create_waymo_infos':
         try:
@@ -801,9 +814,9 @@ if __name__ == '__main__':
         create_waymo_infos(
             dataset_cfg=dataset_cfg,
             class_names=['Vehicle', 'Pedestrian', 'Cyclist'],
-            data_path=ROOT_DIR / 'data' / 'waymo',
-            save_path=ROOT_DIR / 'data' / 'waymo',
-            raw_data_tag='raw_data',
+            data_path=ROOT_DIR / 'ZYR' / 'waymo',
+            save_path=ROOT_DIR / 'ZYR' / 'waymo',
+            raw_data_tag='raw',
             processed_data_tag=args.processed_data_tag,
             update_info_only=args.update_info_only
         )
@@ -817,8 +830,8 @@ if __name__ == '__main__':
         create_waymo_gt_database(
             dataset_cfg=dataset_cfg,
             class_names=['Vehicle', 'Pedestrian', 'Cyclist'],
-            data_path=ROOT_DIR / 'data' / 'waymo',
-            save_path=ROOT_DIR / 'data' / 'waymo',
+            data_path=ROOT_DIR / 'ZYR' / 'waymo',
+            save_path=ROOT_DIR / 'ZYR' / 'waymo',
             processed_data_tag=args.processed_data_tag,
             use_parallel=args.use_parallel, 
             crop_gt_with_tail=not args.wo_crop_gt_with_tail
