@@ -29,11 +29,13 @@ def parse_config():
     parser.add_argument('--ckpt', type=str, default=None, help='checkpoint to start from')
     parser.add_argument('--pretrained_model', type=str, default=None, help='pretrained_model')
     parser.add_argument('--launcher', choices=['none', 'pytorch', 'slurm'], default='none')
+    # 提前local_rank的位置
+    parser.add_argument('--local_rank', type=int, default=0, help='local rank for distributed training')
     parser.add_argument('--tcp_port', type=int, default=18888, help='tcp port for distrbuted training')
     parser.add_argument('--sync_bn', action='store_true', default=False, help='whether to use sync bn')
     parser.add_argument('--fix_random_seed', action='store_true', default=False, help='')
     parser.add_argument('--ckpt_save_interval', type=int, default=1, help='number of training epochs')
-    parser.add_argument('--local_rank', type=int, default=0, help='local rank for distributed training')
+    # parser.add_argument('--local_rank', type=int, default=0, help='local rank for distributed training')
     parser.add_argument('--max_ckpt_save_num', type=int, default=30, help='max number of saved checkpoint')
     parser.add_argument('--merge_all_iters_to_one_epoch', action='store_true', default=False, help='')
     parser.add_argument('--set', dest='set_cfgs', default=None, nargs=argparse.REMAINDER,
@@ -69,10 +71,20 @@ def parse_config():
 
 def main():
     args, cfg = parse_config()
+    # if args.launcher == 'none':
+    #     dist_train = False
+    #     total_gpus = 1
+    # else:
+    #     total_gpus, cfg.LOCAL_RANK = getattr(common_utils, 'init_dist_%s' % args.launcher)(
+    #         args.tcp_port, args.local_rank, backend='nccl'
+    #     )
+    #     dist_train = True
     if args.launcher == 'none':
         dist_train = False
         total_gpus = 1
+        args.local_rank = 0
     else:
+        args.local_rank = int(os.environ["LOCAL_RANK"])  # 从环境变量获取
         total_gpus, cfg.LOCAL_RANK = getattr(common_utils, 'init_dist_%s' % args.launcher)(
             args.tcp_port, args.local_rank, backend='nccl'
         )
