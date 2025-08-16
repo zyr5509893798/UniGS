@@ -525,19 +525,20 @@ if __name__ == '__main__':
 
     if args.func == 'create_nuscenes_infos':
         dataset_cfg = EasyDict(yaml.safe_load(open(args.cfg_file)))
-        ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+        # ROOT_DIR = (Path(__file__).resolve().parent / '../../../').resolve()
+        ROOT_DIR = Path('/data2')
         dataset_cfg.VERSION = args.version
         create_nuscenes_info(
             version=dataset_cfg.VERSION,
-            data_path=ROOT_DIR / 'data' / 'nuscenes',
-            save_path=ROOT_DIR / 'data' / 'nuscenes',
+            data_path=ROOT_DIR / 'nuscenes',
+            save_path=ROOT_DIR / 'nuscenes',
             max_sweeps=dataset_cfg.MAX_SWEEPS,
             with_cam=args.with_cam
         )
 
         nuscenes_dataset = NuScenesDataset(
             dataset_cfg=dataset_cfg, class_names=None,
-            root_path=ROOT_DIR / 'data' / 'nuscenes',
+            root_path=ROOT_DIR / 'nuscenes',
             logger=common_utils.create_logger(), training=True
         )
         nuscenes_dataset.create_groundtruth_database(
