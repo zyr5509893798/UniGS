@@ -1,0 +1,26 @@
+# 编译文件
+*.so
+*.pkl
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+*.log
+
+# 数据文件
+data/
+*.pth
+*.pkl
+
+# 输出和临时文件
+output/
+See
+
+# 编辑器文件
+.vscode/
+.idea/
+
+# 其他
+unitr_pretrain.pth
+pyproject.toml
