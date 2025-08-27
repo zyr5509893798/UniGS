@@ -1,3 +1,4 @@
+from .UniGS import UniGS
 from .detector3d_template import Detector3DTemplate
 from .PartA2_net import PartA2Net
 from .point_rcnn import PointRCNN
@@ -37,7 +38,8 @@ __all__ = {
     'TransFusion': TransFusion,
     'BevFusion': BevFusion,
     'UniTR': UniTR,
-    'UniTRMAP':UniTRMAP
+    'UniTRMAP':UniTRMAP,
+    'UniGS':UniGS
 }
 
 
