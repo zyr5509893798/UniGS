@@ -516,13 +516,13 @@ def create_nuscenes_info(version, data_path, save_path, max_sweeps=10, with_cam=
 
     if version == 'v1.0-test':
         print('test sample: %d' % len(train_nusc_infos))
-        with open(save_path / f'nuscenes_infos_{max_sweeps}sweeps_test.pkl', 'wb') as f:
+        with open(save_path / f'onetestnexttoken_nuscenes_infos_{max_sweeps}sweeps_test.pkl', 'wb') as f:
             pickle.dump(train_nusc_infos, f)
     else:
         print('train sample: %d, val sample: %d' % (len(train_nusc_infos), len(val_nusc_infos)))
-        with open(save_path / f'nuscenes_infos_{max_sweeps}sweeps_train.pkl', 'wb') as f:
+        with open(save_path / f'onetestnexttoken_nuscenes_infos_{max_sweeps}sweeps_train.pkl', 'wb') as f:
             pickle.dump(train_nusc_infos, f)
-        with open(save_path / f'nuscenes_infos_{max_sweeps}sweeps_val.pkl', 'wb') as f:
+        with open(save_path / f'onetestnexttoken_nuscenes_infos_{max_sweeps}sweeps_val.pkl', 'wb') as f:
             pickle.dump(val_nusc_infos, f)
 
 
