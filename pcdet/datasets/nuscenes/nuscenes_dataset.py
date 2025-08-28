@@ -495,6 +495,25 @@ def create_nuscenes_info(version, data_path, save_path, max_sweeps=10, with_cam=
         test='test' in version, max_sweeps=max_sweeps, with_cam=with_cam
     )
 
+    # 添加下一帧信息
+    for infos in [train_nusc_infos, val_nusc_infos]:
+        # 创建token到索引的映射
+        token_to_idx = {info['token']: i for i, info in enumerate(infos)}
+
+        for i, info in enumerate(infos):
+            # 获取下一帧的token（如果存在）
+            next_token = nusc.get('sample', info['token']).get('next', '')
+            if next_token and next_token in token_to_idx:
+                info['next_token'] = next_token
+                # 预加载下一帧的相机信息
+                next_info = infos[token_to_idx[next_token]]
+                info['next_cams'] = next_info['cams']
+                print("下一帧token:", next_token)
+            else:
+                info['next_token'] = None
+                info['next_cams'] = None
+                print("找不到nextToken")
+
     if version == 'v1.0-test':
         print('test sample: %d' % len(train_nusc_infos))
         with open(save_path / f'nuscenes_infos_{max_sweeps}sweeps_test.pkl', 'wb') as f:
