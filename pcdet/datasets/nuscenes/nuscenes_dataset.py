@@ -38,6 +38,9 @@ class NuScenesDataset(DatasetTemplate):
         if self.training and self.dataset_cfg.get('BALANCED_RESAMPLING', False):
             self.infos = self.balanced_infos_resampling(self.infos)
 
+        # 创建token到索引的映射，用于快速查找下一帧
+        self.token_to_idx = {info['token']: i for i, info in enumerate(self.infos)}
+
     def include_nuscenes_data(self, mode):
         self.logger.info('Loading NuScenes dataset')
         nuscenes_infos = []
@@ -168,6 +171,8 @@ class NuScenesDataset(DatasetTemplate):
         input_dict["camera2ego"] = []
         input_dict["camera_intrinsics"] = []
         input_dict["camera2lidar"] = []
+        # 增加全局
+        input_dict["camera2global"] = []
 
         for _, camera_info in info["cams"].items():
             input_dict["image_paths"].append(camera_info["data_path"])
@@ -204,6 +209,14 @@ class NuScenesDataset(DatasetTemplate):
             camera2lidar[:3, :3] = camera_info["sensor2lidar_rotation"]
             camera2lidar[:3, 3] = camera_info["sensor2lidar_translation"]
             input_dict["camera2lidar"].append(camera2lidar)
+
+            # camera to global变换（用于3DGS渲染）
+            ego2global = np.eye(4).astype(np.float32)
+            ego2global[:3, :3] = Quaternion(next_info["ego2global_rotation"]).rotation_matrix
+            ego2global[:3, 3] = next_info["ego2global_translation"]
+            camera2global = ego2global @ camera2ego
+            input_dict["camera2global"].append(camera2global)
+
         # read image
         filename = input_dict["image_paths"]
         images = []
@@ -217,6 +230,103 @@ class NuScenesDataset(DatasetTemplate):
         # resize and crop image
         input_dict = self.crop_image(input_dict)
 
+        return input_dict
+
+    def load_next_frame_info(self, input_dict, next_info):
+        """加载下一帧的相机信息"""
+        if next_info is None:
+            return input_dict
+
+        input_dict["next_image_paths"] = []
+        input_dict["next_lidar2camera"] = []
+        input_dict["next_lidar2image"] = []
+        input_dict["next_camera2ego"] = []
+        input_dict["next_camera_intrinsics"] = []
+        input_dict["next_camera2lidar"] = []
+        input_dict["next_camera2global"] = []
+
+        for _, camera_info in next_info["cams"].items():
+            input_dict["next_image_paths"].append(camera_info["data_path"])
+
+            # 下一帧的lidar to camera变换
+            lidar2camera_r = np.linalg.inv(camera_info["sensor2lidar_rotation"])
+            lidar2camera_t = camera_info["sensor2lidar_translation"] @ lidar2camera_r.T
+            lidar2camera_rt = np.eye(4).astype(np.float32)
+            lidar2camera_rt[:3, :3] = lidar2camera_r.T
+            lidar2camera_rt[3, :3] = -lidar2camera_t
+            input_dict["next_lidar2camera"].append(lidar2camera_rt.T)
+
+            # 下一帧的相机内参
+            camera_intrinsics = np.eye(4).astype(np.float32)
+            camera_intrinsics[:3, :3] = camera_info["camera_intrinsics"]
+            input_dict["next_camera_intrinsics"].append(camera_intrinsics)
+
+            # 下一帧的lidar to image变换
+            lidar2image = camera_intrinsics @ lidar2camera_rt.T
+            input_dict["next_lidar2image"].append(lidar2image)
+
+            # 下一帧的camera to ego变换
+            camera2ego = np.eye(4).astype(np.float32)
+            camera2ego[:3, :3] = Quaternion(camera_info["sensor2ego_rotation"]).rotation_matrix
+            camera2ego[:3, 3] = camera_info["sensor2ego_translation"]
+            input_dict["next_camera2ego"].append(camera2ego)
+
+            # 下一帧的camera to lidar变换
+            camera2lidar = np.eye(4).astype(np.float32)
+            camera2lidar[:3, :3] = camera_info["sensor2lidar_rotation"]
+            camera2lidar[:3, 3] = camera_info["sensor2lidar_translation"]
+            input_dict["next_camera2lidar"].append(camera2lidar)
+
+            # 下一帧的camera to global变换（用于3DGS渲染）
+            ego2global = np.eye(4).astype(np.float32)
+            ego2global[:3, :3] = Quaternion(next_info["ego2global_rotation"]).rotation_matrix
+            ego2global[:3, 3] = next_info["ego2global_translation"]
+            camera2global = ego2global @ camera2ego
+            input_dict["next_camera2global"].append(camera2global)
+
+        # 读取下一帧图像
+        filename = input_dict["next_image_paths"]
+        next_images = []
+        for name in filename:
+            next_images.append(Image.fromarray(np.array(Image.open(str(self.root_path / name)))[:, :, ::-1]))  # bgr
+
+        input_dict["next_camera_imgs"] = next_images
+        input_dict["next_ori_shape"] = next_images[0].size
+
+        # 调整下一帧图像尺寸（与当前帧使用相同的预处理）
+        input_dict = self.crop_next_image(input_dict)
+
+        return input_dict
+
+    def crop_next_image(self, input_dict):
+        """裁剪下一帧图像（使用与当前帧相同的参数）"""
+        W, H = input_dict["next_ori_shape"]
+        imgs = input_dict["next_camera_imgs"]
+        crop_images = []
+
+        for img in imgs:
+            # 使用与当前帧相同的裁剪参数
+            if hasattr(input_dict, 'img_process_infos'):
+                # 如果当前帧有处理信息，使用相同的参数
+                resize, crop, _, _ = input_dict['img_process_infos'][0]  # 假设所有相机使用相同参数
+                img = img.resize((int(W * resize), int(H * resize)))
+                img = img.crop(crop)
+            else:
+                # 否则使用默认测试参数
+                fH, fW = self.camera_image_config.FINAL_DIM
+                resize_lim = self.camera_image_config.RESIZE_LIM_TEST
+                resize = np.mean(resize_lim)
+                resize_dims = (int(W * resize), int(H * resize))
+                newW, newH = resize_dims
+                crop_h = newH - fH
+                crop_w = int(max(0, newW - fW) / 2)
+                crop = (crop_w, crop_h, crop_w + fW, crop_h + fH)
+                img = img.resize(resize_dims)
+                img = img.crop(crop)
+
+            crop_images.append(img)
+
+        input_dict['next_camera_imgs'] = crop_images
         return input_dict
 
     def __len__(self):
@@ -260,6 +370,17 @@ class NuScenesDataset(DatasetTemplate):
 
         if self.use_camera:
             input_dict = self.load_camera_info(input_dict, info)
+
+            # 获取下一帧信息
+            next_info = None
+            if 'next_token' in info and info['next_token'] is not None:
+                next_idx = self.token_to_idx.get(info['next_token'])
+                if next_idx is not None:
+                    next_info = copy.deepcopy(self.infos[next_idx])
+
+            # 加载下一帧的相机信息
+            if next_info is not None:
+                input_dict = self.load_next_frame_info(input_dict, next_info)
 
         data_dict = self.prepare_data(data_dict=input_dict)
 

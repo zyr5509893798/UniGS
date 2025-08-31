@@ -377,6 +377,11 @@ def fill_trainval_infos(data_path, nusc, train_scenes, val_scenes, test=False, m
         location = nusc.get(
             "log", nusc.get("scene", sample["scene_token"])["log_token"]
         )["location"]
+
+        # 添加 ego2global 信息
+        ego2global_rotation = ref_pose_rec['rotation']
+        ego2global_translation = ref_pose_rec['translation']
+
         info = {
             'lidar_path': Path(ref_lidar_path).relative_to(data_path).__str__(),
             'cam_front_path': Path(ref_cam_path).relative_to(data_path).__str__(),
@@ -387,6 +392,9 @@ def fill_trainval_infos(data_path, nusc, train_scenes, val_scenes, test=False, m
             'car_from_global': car_from_global,
             'timestamp': ref_time,
             "location": location,
+            # 添加 ego2global 信息
+            'ego2global_rotation': ego2global_rotation,
+            'ego2global_translation': ego2global_translation,
         }
         if with_cam:
             info['cams'] = dict()
